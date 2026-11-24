@@ -35,6 +35,13 @@ function generateId(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 }
 
+function sortNotesForSync(notes: StudyNote[]): StudyNote[] {
+  return [...notes].sort((a, b) =>
+    Number(Boolean(a.parent_id)) - Number(Boolean(b.parent_id)) ||
+    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+}
+
 // Only query remote Supabase if client is initialized AND user is a real authenticated UUID (never for guest or empty)
 export function isRemoteUser(userId?: string): boolean {
   return Boolean(isSupabaseConfigured && supabase && userId && userId !== 'guest' && userId.length > 10);
@@ -766,7 +773,7 @@ export async function syncPendingOfflineData(userId?: string): Promise<{ syncedA
   const pendingNotes = lsGet<StudyNote>(LS_KEYS.pendingSyncNotes);
   if (pendingNotes.length > 0) {
     const remainingNotes: StudyNote[] = [];
-    for (const note of pendingNotes) {
+    for (const note of sortNotesForSync(pendingNotes)) {
       try {
         const noteToSync = { ...note, user_id: effectiveUserId! };
         const res = await sb(async () => {
@@ -794,7 +801,7 @@ export async function syncPendingOfflineData(userId?: string): Promise<{ syncedA
 }
 
 // ============================================================
-// Study Notes Service (.md and .txt notes)
+// Study notes and book chapters
 // Cloud Supabase Sync + PWA Offline LocalStorage Fallback
 // ============================================================
 
@@ -1060,9 +1067,20 @@ export async function deleteNote(noteId: string, userId?: string): Promise<void>
   const target = notes.find(n => n.id === noteId);
   const effectiveUserId = userId || target?.user_id;
 
-  lsSet(LS_KEYS.notes, notes.filter(n => n.id !== noteId));
+  const deletedIds = new Set([noteId]);
+  let foundChildren = true;
+  while (foundChildren) {
+    foundChildren = false;
+    notes.forEach(note => {
+      if (note.parent_id && deletedIds.has(note.parent_id) && !deletedIds.has(note.id)) {
+        deletedIds.add(note.id);
+        foundChildren = true;
+      }
+    });
+  }
+  lsSet(LS_KEYS.notes, notes.filter(n => !deletedIds.has(n.id)));
 
-  const pending = lsGet<StudyNote>(LS_KEYS.pendingSyncNotes).filter(n => n.id !== noteId);
+  const pending = lsGet<StudyNote>(LS_KEYS.pendingSyncNotes).filter(n => !deletedIds.has(n.id));
   lsSet(LS_KEYS.pendingSyncNotes, pending);
   invalidateCache('notes');
 
@@ -1089,7 +1107,7 @@ export async function syncNotesWithCloud(userId?: string): Promise<{ success: bo
     const pendingNotes = lsGet<StudyNote>(LS_KEYS.pendingSyncNotes);
     if (pendingNotes.length > 0) {
       const remaining: StudyNote[] = [];
-      for (const note of pendingNotes) {
+      for (const note of sortNotesForSync(pendingNotes)) {
         try {
           const res = await sb(async () => {
             const { error } = await supabase!.from('notes').upsert({ ...note, user_id: userId! });
@@ -1123,7 +1141,7 @@ export async function syncNotesWithCloud(userId?: string): Promise<{ success: bo
 }
 
 export function downloadNote(note: StudyNote): void {
-  const ext = note.file_type === 'md' ? '.md' : '.txt';
+  const ext = note.file_type === 'md' ? '.md' : note.file_type === 'html' ? '.html' : '.txt';
   const cleanTitle = note.title.replace(/[/\\?%*:|"<>]/g, '_');
   const filename = note.file_name || `${cleanTitle}${ext}`;
   const blob = new Blob([note.content], { type: 'text/plain;charset=utf-8' });

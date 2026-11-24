@@ -438,7 +438,9 @@ CREATE TABLE IF NOT EXISTS notes (
   user_id TEXT NOT NULL,
   title TEXT NOT NULL,
   content TEXT NOT NULL,
-  file_type TEXT NOT NULL DEFAULT 'md' CHECK (file_type IN ('md', 'txt')),
+  file_type TEXT NOT NULL DEFAULT 'md' CHECK (file_type IN ('md', 'txt', 'html', 'book')),
+  parent_id TEXT REFERENCES notes(id) ON DELETE CASCADE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
   subject TEXT DEFAULT 'General Studies',
   topic TEXT DEFAULT '',
   tags TEXT[] DEFAULT '{}',
@@ -456,6 +458,7 @@ CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);
 CREATE INDEX IF NOT EXISTS idx_notes_subject ON notes(subject);
 CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notes_is_pinned ON notes(is_pinned);
+CREATE INDEX IF NOT EXISTS idx_notes_parent_id_sort_order ON notes(parent_id, sort_order);
 
 -- Row Level Security (RLS)
 ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
@@ -475,5 +478,4 @@ CREATE POLICY "Users can update own notes" ON notes
 DROP POLICY IF EXISTS "Users can delete own notes" ON notes;
 CREATE POLICY "Users can delete own notes" ON notes
   FOR DELETE USING (user_id = auth.uid()::text);
-
 
