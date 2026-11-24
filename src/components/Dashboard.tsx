@@ -65,7 +65,7 @@ export default function Dashboard({
       setAttempts(a);
       setMistakes(m);
       setBookmarks(b);
-      setNotesCount(n.length);
+      setNotesCount(n.filter(note => !note.parent_id && (note.file_type === 'md' || note.file_type === 'txt')).length);
     }
     load();
   }, [effectiveUserId, refreshKey]);

@@ -69,6 +69,8 @@ Execute the SQL schema in your Supabase SQL Editor:
 - File: `supabase/schema.sql`
 - This creates all necessary tables, indexes, and RLS policies
 
+For an existing deployment, also run `supabase/migrations/add_book_chapters.sql` to enable book modules, ordered chapters, and HTML lessons.
+
 ## 📦 GitHub Pages Deployment
 
 ### 1. Configure Vite Base Path

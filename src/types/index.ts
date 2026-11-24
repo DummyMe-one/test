@@ -288,7 +288,9 @@ export interface StudyNote {
   user_id: string;
   title: string;
   content: string;
-  file_type: 'md' | 'txt';
+  file_type: 'md' | 'txt' | 'html' | 'book';
+  parent_id?: string | null;
+  sort_order?: number;
   subject?: string;
   topic?: string;
   tags?: string[];

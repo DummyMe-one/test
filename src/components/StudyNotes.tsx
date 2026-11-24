@@ -16,6 +16,7 @@ import {
 import MarkdownViewer, { extractHeadings, slugify } from './MarkdownViewer';
 import EReaderView, { ReaderGeometricMotif } from './EReaderView';
 import ChapterOneView from './ChapterOneView';
+import StudyBooks from './StudyBooks';
 import { useTheme } from '../hooks/useTheme';
 import { convertNotionHtmlToMarkdown, smartNotionConvertWithFallback } from '../utils/notionParser';
 import {
@@ -81,6 +82,7 @@ const NOTION_EMOJIS = [
 
 export default function StudyNotes({ userId }: StudyNotesProps) {
   const effectiveUserId = userId || 'guest';
+  const [activeSection, setActiveSection] = useState<'notes' | 'books'>('notes');
   const [notes, setNotes] = useState<StudyNote[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -169,7 +171,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
     setLoading(true);
     try {
       const data = await getNotes(effectiveUserId);
-      setNotes(data);
+      setNotes(data.filter(n => !n.parent_id && (n.file_type === 'md' || n.file_type === 'txt')));
     } catch (e) {
       console.error('Failed to load notes:', e);
     } finally {
@@ -211,8 +213,9 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
       const res = await syncNotesWithCloud(effectiveUserId);
       if (res.success) {
         const freshNotes = await getNotes(effectiveUserId);
-        setNotes(freshNotes);
-        setSyncNotification(`☁️ Synced with Supabase database (${freshNotes.length} notes up to date)`);
+        const regularNotes = freshNotes.filter(n => !n.parent_id && (n.file_type === 'md' || n.file_type === 'txt'));
+        setNotes(regularNotes);
+        setSyncNotification(`☁️ Synced with Supabase database (${regularNotes.length} notes up to date)`);
       } else {
         setSyncNotification(`⚠️ ${res.error || 'Sync failed'}`);
       }
@@ -627,7 +630,29 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
 
   return (
     <div className="space-y-5 animate-fadeIn max-w-7xl mx-auto">
-      {viewMode === 'editorial' ? (
+      <div className="inline-flex p-1 rounded-xl bg-[var(--bg-subcard)] border border-[var(--border-color)]" role="tablist" aria-label="Study materials">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeSection === 'notes'}
+          onClick={() => setActiveSection('notes')}
+          className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeSection === 'notes' ? 'bg-indigo-600 text-white shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}
+        >
+          Notes
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeSection === 'books'}
+          onClick={() => setActiveSection('books')}
+          className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${activeSection === 'books' ? 'bg-indigo-600 text-white shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}
+        >
+          Books &amp; Chapters
+        </button>
+      </div>
+      {activeSection === 'books' ? (
+        <StudyBooks userId={effectiveUserId} />
+      ) : viewMode === 'editorial' ? (
         <ChapterOneView
           notes={notes}
           onOpenNote={note => setActiveNote(note)}
@@ -1583,7 +1608,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                       <div className="flex-1 p-3 overflow-y-auto custom-scrollbar bg-[var(--bg-surface)] rounded-xl border border-[var(--border-color)]">
                         <MarkdownViewer
                           content={editingNote.content || ''}
-                          fileType={editingNote.file_type || 'md'}
+                          fileType={editingNote.file_type === 'txt' ? 'txt' : 'md'}
                           fontStyle={editingNote.font_style || 'sans'}
                           onToggleTask={handleEditorToggleTask}
                         />
@@ -1595,7 +1620,7 @@ export default function StudyNotes({ userId }: StudyNotesProps) {
                     <div className="max-w-3xl mx-auto">
                       <MarkdownViewer
                         content={editingNote.content || ''}
-                        fileType={editingNote.file_type || 'md'}
+                        fileType={editingNote.file_type === 'txt' ? 'txt' : 'md'}
                         fontStyle={editingNote.font_style || 'sans'}
                         onToggleTask={handleEditorToggleTask}
                       />

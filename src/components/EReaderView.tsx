@@ -627,7 +627,7 @@ export default function EReaderView({
             ) : (
               <MarkdownViewer
                 content={note.content}
-                fileType={note.file_type}
+                fileType={note.file_type === 'txt' ? 'txt' : 'md'}
                 fontSize={fontSize}
                 fontStyle={fontFamily}
                 onToggleTask={onToggleTask}
